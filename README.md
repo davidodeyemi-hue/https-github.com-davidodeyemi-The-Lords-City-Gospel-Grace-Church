@@ -8,11 +8,13 @@ The work is staged on a feature branch until these resources are connected. Do n
 
 1. In Cloudflare **D1 SQL Database**, create `lords-city-church`.
 2. Open its SQL console and run the statements in `migrations/0001_init.sql` in order. Alternatively run `npx wrangler d1 execute lords-city-church --remote --file=migrations/0001_init.sql` from a machine authenticated to this Cloudflare account.
-3. In **Workers & Pages → the-lords-city-gospel-grace-church → Settings → Bindings**, add a production D1 binding named exactly `DB` for that database.
-4. Create an R2 bucket named `lords-city-photos`. Add a production R2 binding named exactly `PHOTOS` to the same Pages project. Uploaded photos stay private in R2 and are served through the website's `/api/photo/:id` route. If R2 is not connected yet, the rest of the site can work, but new photo uploads will be unavailable.
-5. In the Pages project's production environment variables, add an **encrypted secret** named `ADMIN_SETUP_KEY`, with a random value of at least 24 characters. Do not put it in GitHub or chat. Redeploy after adding bindings and the secret. Remove this secret after the first administrator account is created.
-6. In the Pages project build settings, set the **build output directory to `dist`**, leave the build command blank, and keep the repository root directory unchanged. This publishes only the site files while Cloudflare builds `functions/` separately. Merge the feature branch to `main` to trigger a Pages deployment. Visit `/api/theme` to verify the database is bound. It should return `{"theme":"Greater Level"}`. Then visit `/admin/`, use the setup key to create the first administrator, and sign in. Create partner and mentee accounts there.
-7. Test a prayer request, an announcement, the monthly theme, one partner update, one mentorship update, and a photo upload. Verify each item is visible only to its intended audience.
+3. Run the additional `migrations/0002_audio.sql` statements in the same D1 database to enable the MP3 message library.
+4. In **Workers & Pages → the-lords-city-gospel-grace-church → Settings → Bindings**, add a production D1 binding named exactly `DB` for that database.
+5. Create an R2 bucket named `lords-city-photos`. Add a production R2 binding named exactly `PHOTOS` to the same Pages project. Uploaded photos stay private in R2 and are served through the website's `/api/photo/:id` route. If R2 is not connected yet, the rest of the site can work, but new photo uploads will be unavailable.
+6. Create a separate R2 bucket named `lords-city-audio` and add a production R2 binding named exactly `AUDIO`. MP3 files are stored there and downloaded through `/api/message/:id`.
+7. In the Pages project's production environment variables, add an **encrypted secret** named `ADMIN_SETUP_KEY`, with a random value of at least 24 characters. Do not put it in GitHub or chat. Redeploy after adding bindings and the secret. Remove this secret after the first administrator account is created.
+8. In the Pages project build settings, set the **build output directory to `dist`**, leave the build command blank, and keep the repository root directory unchanged. This publishes only the site files while Cloudflare builds `functions/` separately. Merge the feature branch to `main` to trigger a Pages deployment. Visit `/api/theme` to verify the database is bound. It should return `{"theme":"Greater Level"}`. Then visit `/admin/`, use the setup key to create the first administrator, and sign in. Create partner and mentee accounts there.
+9. Test a prayer request, an announcement, the monthly theme, one partner update, one mentorship update, a photo upload, and an MP3 upload and download. Verify each item is visible only to its intended audience.
 
 Cloudflare Pages currently publishes from the repository root. Before releasing the new features, change the build output directory to `dist` so the `functions/` source and SQL migration are not served as static files. Keep the build command blank and the root directory as the repository root. Pages requires Git integration for these Functions.
 
@@ -23,5 +25,5 @@ The giving page intentionally contains no bank account, checkout, or payment lin
 - `index.html`, `photos/`, and page directories: public content.
 - `site.css`, `site.js`: common styling and browser actions.
 - `functions/api/[[path]].js`: Pages Functions for authentication, prayer, updates, and photo uploads.
-- `migrations/0001_init.sql`: D1 database schema.
+- `migrations/0001_init.sql` and `0002_audio.sql`: D1 database schema.
 - `dist/`: mirrored static output for the original deployment setting.

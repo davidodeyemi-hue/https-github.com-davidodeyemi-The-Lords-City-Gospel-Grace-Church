@@ -148,6 +148,32 @@ export async function onRequest({ request, env, params }) {
       const object=await env.PHOTOS.get(photo.object_key);
       return object ? new Response(object.body,{headers:{'content-type':photo.mime_type,'cache-control':'public, max-age=3600','x-content-type-options':'nosniff'}}) : json({error:'Photo not found.'},404);
     }
+    if (path === '/messages' && method === 'GET') {
+      const result=await db.prepare('SELECT id,title,event_name,event_date,speaker,byte_size FROM audio_messages ORDER BY event_date DESC, created_at DESC LIMIT 100').all();
+      return json({messages:result.results});
+    }
+    if (path === '/messages' && method === 'POST') {
+      if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
+      if (!env.AUDIO) return json({error:'Audio storage is not configured.'},503);
+      if (Number(request.headers.get('content-length')||0)>42_000_000) return json({error:'Audio file exceeds the 40 MB limit.'},413);
+      const data=await request.formData(), file=data.get('audio');
+      const title=clean(data.get('title'),160), event=clean(data.get('event_name'),160), date=clean(data.get('event_date'),10), speaker=clean(data.get('speaker'),120);
+      if (!(file instanceof File) || !title || !event || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || file.size<1 || file.size>40_000_000 || !['audio/mpeg','audio/mp3','application/octet-stream'].includes(file.type) || !/\.mp3$/i.test(file.name)) return json({error:'Enter a title, event and valid date, then choose an MP3 under 40 MB.'},400);
+      const buffer=await file.arrayBuffer(), head=new Uint8Array(buffer.slice(0,4));
+      if (!(hex(head.slice(0,3))==='494433' || head[0]===255&&(head[1]&224)===224)) return json({error:'The file is not a valid MP3.'},400);
+      const id=crypto.randomUUID(), key='messages/'+id+'.mp3';
+      await env.AUDIO.put(key,buffer,{httpMetadata:{contentType:'audio/mpeg'}});
+      await db.prepare('INSERT INTO audio_messages(id,title,event_name,event_date,speaker,object_key,byte_size) VALUES(?,?,?,?,?,?,?)').bind(id,title,event,date,speaker,key,file.size).run();
+      return json({ok:true,id},201);
+    }
+    if (path.startsWith('/message/') && method === 'GET') {
+      const id=path.slice(9), row=await db.prepare('SELECT object_key FROM audio_messages WHERE id=?').bind(id).first();
+      if (!row || !env.AUDIO) return json({error:'Message not found.'},404);
+      const object=await env.AUDIO.get(row.object_key);
+      if (!object) return json({error:'Message not found.'},404);
+      const download=new URL(request.url).searchParams.has('download');
+      return new Response(object.body,{headers:{'content-type':'audio/mpeg','content-length':String(object.size),'content-disposition':download?`attachment; filename="message-${id}.mp3"`:`inline; filename="message-${id}.mp3"`,'accept-ranges':'none','x-content-type-options':'nosniff','cache-control':'public, max-age=3600'}});
+    }
     return json({error:'Not found.'},404);
   } catch (error) {
     if (/^(Request too large|Unexpected token)/.test(error.message)) return json({error:'Invalid request.'},400);
