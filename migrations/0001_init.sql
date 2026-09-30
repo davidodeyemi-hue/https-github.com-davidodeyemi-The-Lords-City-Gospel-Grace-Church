@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS content (
 );
 CREATE INDEX IF NOT EXISTS content_section_date ON content(section,published_at DESC);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-INSERT OR IGNORE INTO settings(key,value) VALUES ('theme','Greater Level');
+INSERT OR IGNORE INTO settings(key,value) VALUES ('annual_theme','The Year of Dominion');
 CREATE TABLE IF NOT EXISTS photos (
   id TEXT PRIMARY KEY,
   caption TEXT NOT NULL,
