@@ -80,11 +80,11 @@ export async function onRequest({ request, env, params }) {
       await db.prepare('INSERT INTO prayer_requests(name,contact,request) VALUES(?,?,?)').bind(name,contact,message).run();
       return json({ ok:true },201);
     }
-    if (path === '/theme' && method === 'GET') return json({ theme: (await db.prepare("SELECT value FROM settings WHERE key='theme'").first())?.value || 'Greater Level' });
+    if (path === '/theme' && method === 'GET') return json({ theme: (await db.prepare("SELECT value FROM settings WHERE key='annual_theme'").first())?.value || 'The Year of Dominion' });
     if (path === '/theme' && method === 'POST') {
       if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
       const value=clean((await body(request)).theme,100); if (!value) return json({error:'Theme is required.'},400);
-      await db.prepare("INSERT INTO settings(key,value) VALUES('theme',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(value).run();
+      await db.prepare("INSERT INTO settings(key,value) VALUES('annual_theme',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(value).run();
       return json({ok:true});
     }
     if (path === '/content' && method === 'GET') {
