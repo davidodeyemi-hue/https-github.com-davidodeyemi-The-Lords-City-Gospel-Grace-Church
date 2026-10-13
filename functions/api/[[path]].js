@@ -44,6 +44,10 @@ export async function onRequest({ request, env, params }) {
   try {
     const user = await current(request, db);
     if (path === '/me' && method === 'GET') return json({ user: user || null });
+    if (path === '/setup-status' && method === 'GET') {
+      const existing = await db.prepare("SELECT id FROM users WHERE role='admin' LIMIT 1").first();
+      return json({ initialized: Boolean(existing), setupReady: !existing && Boolean(env.ADMIN_SETUP_KEY && env.ADMIN_SETUP_KEY.length >= 24) });
+    }
     if (path === '/bootstrap' && method === 'POST') {
       if (!env.ADMIN_SETUP_KEY || env.ADMIN_SETUP_KEY.length < 24) return json({ error: 'Admin setup key is not configured.' }, 503);
       const existing = await db.prepare("SELECT id FROM users WHERE role='admin' LIMIT 1").first();
