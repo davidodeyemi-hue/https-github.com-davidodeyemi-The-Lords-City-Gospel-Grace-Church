@@ -4,15 +4,26 @@ const sha = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-25
 const random = () => crypto.randomUUID() + crypto.randomUUID();
 const hex = bytes => [...bytes].map(x => x.toString(16).padStart(2, '0')).join('');
 const bytes = value => new Uint8Array(value.match(/../g).map(x => parseInt(x, 16)));
-async function hashPassword(password, salt = hex(crypto.getRandomValues(new Uint8Array(16)))) {
+// Keep each PBKDF2 call within Cloudflare's production iteration limit.
+// Record the work factor so future changes do not invalidate stored passwords.
+async function hashPassword(password, salt = hex(crypto.getRandomValues(new Uint8Array(16))), iterations = 100000) {
   const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const result = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: bytes(salt), iterations: 210000, hash: 'SHA-256' }, key, 256);
-  return salt + ':' + hex(new Uint8Array(result));
+  const result = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: bytes(salt), iterations, hash: 'SHA-256' }, key, 256);
+  return 'pbkdf2-sha256:' + iterations + ':' + salt + ':' + hex(new Uint8Array(result));
 }
 async function verifyPassword(password, stored) {
-  if (!stored || !/^[a-f0-9]{32}:[a-f0-9]{64}$/.test(stored)) return false;
-  const computed = await hashPassword(password, stored.split(':')[0]);
-  return crypto.subtle.timingSafeEqual ? crypto.subtle.timingSafeEqual(bytes(computed.split(':')[1]), bytes(stored.split(':')[1])) : computed === stored;
+  if (typeof stored !== 'string') return false;
+  let salt, expected, iterations;
+  const versioned = stored.match(/^pbkdf2-sha256:(100000|210000):([a-f0-9]{32}):([a-f0-9]{64})$/);
+  const legacy = stored.match(/^([a-f0-9]{32}):([a-f0-9]{64})$/);
+  if (versioned) [, iterations, salt, expected] = versioned;
+  else if (legacy) { [, salt, expected] = legacy; iterations = 210000; }
+  else return false;
+  const computed = (await hashPassword(password, salt, Number(iterations))).split(':')[3];
+  const actualBytes = bytes(computed), expectedBytes = bytes(expected);
+  let difference = 0;
+  for (let i = 0; i < actualBytes.length; i++) difference |= actualBytes[i] ^ expectedBytes[i];
+  return difference === 0;
 }
 const cookie = (token, age) => `lordcity_session=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${age}`;
 async function current(request, db) {
