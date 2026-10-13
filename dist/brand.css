@@ -54,3 +54,5 @@ header{background:rgba(8,14,41,.96);color:#f5f5fa;border-bottom:1px solid #889ff
 .giving-narration{margin-top:23px;padding:17px 18px;background:#080f294d;border-left:2px solid #efae67;border-radius:0 8px 8px 0}.giving-narration h3{font-size:14px;margin:0 0 6px}.giving-narration p{font-size:13px;margin:0;line-height:1.6}.giving-address{font-size:12px;color:#9eb2d7;margin:20px 0 0}
 @media(max-width:1150px){.site-header .site-header-inner{flex-wrap:wrap;gap:0;min-height:74px}.site-menu-button{display:block;margin-left:auto}.site-nav{display:none;flex-basis:100%;justify-content:flex-start;padding:20px 0 8px;gap:18px 22px}.site-nav.is-open{display:flex}}
 @media(max-width:700px){.giving-layout{grid-template-columns:1fr;gap:22px;margin-top:4px}.giving-intro h1{font-size:40px}.giving-intro .lead{max-width:none}.interior-page .bank-card{padding:23px}.site-header .site-header-inner{width:calc(100% - 32px)}.site-brand span{font-size:10px}.site-brand img{width:43px;height:43px}.interior-page main.wrap{padding-top:30px}}
+
+html{background:#080e29}body{min-height:100vh}
