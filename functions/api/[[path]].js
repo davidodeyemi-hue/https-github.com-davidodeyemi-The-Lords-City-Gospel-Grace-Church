@@ -95,6 +95,25 @@ export async function onRequest({ request, env, params }) {
       await db.prepare('INSERT INTO prayer_requests(name,contact,request) VALUES(?,?,?)').bind(name,contact,message).run();
       return json({ ok:true },201);
     }
+    if (path === '/church-word' && method === 'GET') {
+      const row = await db.prepare("SELECT value FROM settings WHERE key='church_word'").first();
+      return json({ word: row ? JSON.parse(row.value) : { title: 'Prophetic declaration', message: '' } });
+    }
+    if (path === '/church-word' && method === 'POST') {
+      if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
+      const input = await body(request);
+      if (typeof input.title !== 'string' || typeof input.message !== 'string' || !input.title.trim() || !input.message.trim() || input.title.length > 150 || input.message.length > 6000) return json({error:'Enter a title (up to 150 characters) and a message (up to 6,000 characters).'},400);
+      const word = { title: input.title.trim(), message: input.message.trim() };
+      await db.prepare("INSERT INTO settings(key,value) VALUES('church_word',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(word)).run();
+      return json({ok:true});
+    }
+    if (path === '/prayers' && method === 'DELETE') {
+      if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
+      const input = await body(request);
+      if (input.confirm !== 'CLEAR' || !Number.isSafeInteger(input.throughId) || input.throughId < 1) return json({error:'Confirm which prayer requests to clear.'},400);
+      const result = await db.prepare('DELETE FROM prayer_requests WHERE id<=?').bind(input.throughId).run();
+      return json({ok:true,deleted:result.meta?.changes || 0});
+    }
     if (path === '/theme' && method === 'GET') return json({ theme: (await db.prepare("SELECT value FROM settings WHERE key='annual_theme'").first())?.value || 'The Year of Dominion' });
     if (path === '/theme' && method === 'POST') {
       if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
@@ -137,7 +156,7 @@ export async function onRequest({ request, env, params }) {
     if (path === '/prayers' && method === 'GET') {
       if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
       const result=await db.prepare('SELECT id,name,contact,request,created_at FROM prayer_requests ORDER BY id DESC LIMIT 100').all();
-      return json({requests:result.results});
+      return json({requests:result.results,clearBefore:result.results.length ? result.results[0].id : 0});
     }
     if (path === '/photos' && method === 'GET') {
       const result=await db.prepare('SELECT id,caption,created_at FROM photos ORDER BY created_at DESC LIMIT 100').all();

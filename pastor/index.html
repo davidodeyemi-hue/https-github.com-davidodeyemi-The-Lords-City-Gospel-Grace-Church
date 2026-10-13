@@ -15,6 +15,13 @@
 <main id="main">
 <section class="hero"><div class="wrap hero-grid"><div><span class="eyebrow">Meet the Presiding Pastor in Charge</span><h1>Pastor Enoch Folorunsho</h1><p class="lead">Serving The Lords City Gospel Grace Ministry with a passion for the true Word of God, prophetic prayer, and seeing people grow into the destinies God has for them.</p></div><figure class="portrait"><img src="/pastor-and-pastor-mrs-enoch-folorunsho.png" alt="Pastor Enoch Folorunsho with Pastor Mrs Tayo Folorunsho"><figcaption>Pastor Enoch Folorunsho and Pastor Mrs Tayo Folorunsho</figcaption></figure></div></section>
 <section class="section"><div class="wrap"><span class="eyebrow">His heart for the ministry</span><h2>Raised to raise destinies</h2><p>Pastor Enoch's ministry is centred on helping people hear and understand God's Word, seek Him in prayer, and find strength to walk in their calling. Through worship, teaching and the church's prayer gatherings, he seeks to make room for people to encounter God's grace and grow in faith.</p><a class="link" href="/#services">See our weekly gatherings →</a></div></section>
-<section class="section declaration" id="prophetic-declaration"><div class="wrap"><span class="eyebrow">A word for the church</span><h2>Prophetic declaration</h2><div class="declaration-card"><p>The pastor's prophetic declaration will be published here when he shares it with the church.</p></div></div></section>
+<section class="section declaration" id="prophetic-declaration"><div class="wrap"><span class="eyebrow">A word for the church</span><h2 id="church-word-title">Prophetic declaration</h2><div class="declaration-card"><p id="church-word-message" style="white-space:pre-wrap;overflow-wrap:anywhere">The pastor's prophetic declaration will be published here when he shares it with the church.</p></div></div></section>
 </main><footer><div class="wrap">The Lords City Gospel Grace Ministry · M.A. Alli Layout, Meridian Bus Stop, Apata, Ibadan</div></footer>
-</body></html>
+<script>
+fetch('/api/church-word').then(r=>{if(!r.ok)throw Error('Unavailable');return r.json()}).then(({word})=>{
+ if(word&&typeof word.message==='string'&&word.message.trim()){
+  document.getElementById('church-word-title').textContent=word.title;
+  document.getElementById('church-word-message').textContent=word.message;
+ }
+}).catch(()=>{document.getElementById('church-word-message').textContent='The latest word could not be loaded. Please refresh this page in a moment.'});
+</script></body></html>
