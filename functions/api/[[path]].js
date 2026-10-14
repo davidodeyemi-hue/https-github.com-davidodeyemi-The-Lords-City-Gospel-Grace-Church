@@ -38,6 +38,20 @@ async function body(request) {
   return JSON.parse(text);
 }
 const clean = (value, max) => String(value || '').trim().slice(0, max);
+const usernameOf = value => clean(value, 30).toLowerCase();
+const validUsername = value => /^[a-z0-9][a-z0-9._-]{3,29}$/.test(value) && !['admin','administrator','root','support','system'].includes(value);
+async function ensureMemberProfiles(db) {
+  await db.prepare(`CREATE TABLE IF NOT EXISTS member_profiles (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    full_name TEXT,
+    gender TEXT,
+    phone TEXT,
+    state TEXT,
+    city TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`).run();
+}
 const allowed = (user, section) => section === 'announcement' || section === 'theme' ? true : section === 'partner' ? ['admin','partner'].includes(user?.role) : section === 'mentorship' ? ['admin','mentee'].includes(user?.role) : false;
 async function limited(db, key, max) {
   const now = Math.floor(Date.now()/1000), row = await db.prepare('SELECT attempts, window_start FROM login_attempts WHERE key=?').bind(key).first();
@@ -71,14 +85,44 @@ export async function onRequest({ request, env, params }) {
       return json({ ok: true }, 201);
     }
     if (path === '/login' && method === 'POST') {
-      const input = await body(request), email = clean(input.email, 200).toLowerCase();
+      const input = await body(request), identifier = clean(input.username || input.email, 200).toLowerCase();
       const ip = await sha(request.headers.get('CF-Connecting-IP') || 'unknown');
       if (await limited(db,'login:' + ip,15)) return json({ error: 'Too many attempts. Try again later.' }, 429);
-      const found = await db.prepare('SELECT id, password_hash FROM users WHERE email=?').bind(email).first();
-      if (!found || !await verifyPassword(String(input.password || ''),found.password_hash)) return json({ error: 'Invalid login details.' }, 401);
+      await ensureMemberProfiles(db);
+      const found = await db.prepare('SELECT users.id, users.password_hash FROM users LEFT JOIN member_profiles ON member_profiles.user_id=users.id WHERE member_profiles.username=? COLLATE NOCASE OR users.email=? COLLATE NOCASE LIMIT 1').bind(identifier,identifier).first();
+      if (!found || !await verifyPassword(String(input.password || ''),found.password_hash)) return json({ error: 'Invalid username or password.' }, 401);
       const token = random();
       await db.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,datetime('now','+7 days'))").bind(await sha(token),found.id).run();
       return json({ ok: true },200,{ 'set-cookie': cookie(token,604800) });
+    }
+    if (path === '/mentee-signup' && method === 'POST') {
+      const input = await body(request);
+      if (input.website) return json({ok:true},201);
+      const ip = await sha(request.headers.get('CF-Connecting-IP') || 'unknown');
+      if (await limited(db,'mentee-signup:' + ip,5)) return json({error:'Too many registration attempts. Please try again later.'},429);
+      const username=usernameOf(input.username), name=clean(input.name,100), email=clean(input.email,200).toLowerCase();
+      const gender=clean(input.gender,30), phone=clean(input.phone,30), state=clean(input.state,80), city=clean(input.city,80);
+      const password=String(input.password||''), confirmation=String(input.passwordConfirmation||'');
+      if (!validUsername(username)) return json({error:'Choose a username of 4 to 30 letters, numbers, dots, hyphens or underscores. It must begin with a letter or number.'},400);
+      if (name.length<2 || !/^\S+@\S+\.\S+$/.test(email) || !['Male','Female','Prefer not to say'].includes(gender) || !/^[+0-9()\s-]{7,30}$/.test(phone) || state.length<2 || city.length<2) return json({error:'Please complete all personal and contact details correctly.'},400);
+      if (password.length<12 || password.length>128) return json({error:'Use a password of at least 12 characters.'},400);
+      if (password!==confirmation) return json({error:'The passwords do not match.'},400);
+      if (input.consent!==true && input.consent!=='yes') return json({error:'Please confirm that the church may use your details for mentorship communication.'},400);
+      await ensureMemberProfiles(db);
+      if (await db.prepare('SELECT id FROM users WHERE email=? COLLATE NOCASE').bind(email).first()) return json({error:'That email is already registered. Please sign in instead.'},409);
+      if (await db.prepare('SELECT user_id FROM member_profiles WHERE username=? COLLATE NOCASE').bind(username).first()) return json({error:'That username is already in use. Please choose another.'},409);
+      let created;
+      try {
+        created=await db.prepare("INSERT INTO users(email,password_hash,role) VALUES(?,?,'mentee')").bind(email,await hashPassword(password)).run();
+        await db.prepare('INSERT INTO member_profiles(user_id,username,full_name,gender,phone,state,city) VALUES(?,?,?,?,?,?,?)').bind(created.meta.last_row_id,username,name,gender,phone,state,city).run();
+      } catch (error) {
+        if (created?.meta?.last_row_id) await db.prepare('DELETE FROM users WHERE id=?').bind(created.meta.last_row_id).run();
+        if (/UNIQUE constraint failed/.test(error.message)) return json({error:'That username or email is already registered.'},409);
+        throw error;
+      }
+      const token=random();
+      await db.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,datetime('now','+7 days'))").bind(await sha(token),created.meta.last_row_id).run();
+      return json({ok:true,username},201,{'set-cookie':cookie(token,604800)});
     }
     if (path === '/logout' && method === 'POST') {
       const token = request.headers.get('cookie')?.match(/(?:^|;\s*)lordcity_session=([^;]+)/)?.[1];
@@ -143,14 +187,26 @@ export async function onRequest({ request, env, params }) {
     }
     if (path === '/users' && method === 'GET') {
       if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
-      const result=await db.prepare('SELECT id,email,role,created_at FROM users ORDER BY id DESC').all();
+      await ensureMemberProfiles(db);
+      const result=await db.prepare('SELECT users.id,users.email,users.role,users.created_at,member_profiles.username,member_profiles.full_name,member_profiles.gender,member_profiles.phone,member_profiles.state,member_profiles.city FROM users LEFT JOIN member_profiles ON member_profiles.user_id=users.id ORDER BY users.id DESC').all();
       return json({users:result.results});
     }
     if (path === '/users' && method === 'POST') {
       if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
-      const input=await body(request), email=clean(input.email,200).toLowerCase();
-      if (!['partner','mentee'].includes(input.role) || !/^\S+@\S+\.\S+$/.test(email) || String(input.password||'').length<16) return json({error:'Enter a valid email, role and password of at least 16 characters.'},400);
-      await db.prepare('INSERT INTO users(email,password_hash,role) VALUES(?,?,?)').bind(email,await hashPassword(input.password),input.role).run();
+      const input=await body(request), email=clean(input.email,200).toLowerCase(), username=usernameOf(input.username);
+      if (!['partner','mentee'].includes(input.role) || !validUsername(username) || !/^\S+@\S+\.\S+$/.test(email) || String(input.password||'').length<16) return json({error:'Enter a unique username, valid email, role and password of at least 16 characters.'},400);
+      await ensureMemberProfiles(db);
+      if (await db.prepare('SELECT id FROM users WHERE email=? COLLATE NOCASE').bind(email).first()) return json({error:'That email is already registered.'},409);
+      if (await db.prepare('SELECT user_id FROM member_profiles WHERE username=? COLLATE NOCASE').bind(username).first()) return json({error:'That username is already in use.'},409);
+      let created;
+      try {
+        created=await db.prepare('INSERT INTO users(email,password_hash,role) VALUES(?,?,?)').bind(email,await hashPassword(input.password),input.role).run();
+        await db.prepare('INSERT INTO member_profiles(user_id,username) VALUES(?,?)').bind(created.meta.last_row_id,username).run();
+      } catch (error) {
+        if (created?.meta?.last_row_id) await db.prepare('DELETE FROM users WHERE id=?').bind(created.meta.last_row_id).run();
+        if (/UNIQUE constraint failed/.test(error.message)) return json({error:'That username or email is already registered.'},409);
+        throw error;
+      }
       return json({ok:true},201);
     }
     if (path === '/prayers' && method === 'GET') {
@@ -211,7 +267,7 @@ export async function onRequest({ request, env, params }) {
     return json({error:'Not found.'},404);
   } catch (error) {
     if (/^(Request too large|Unexpected token)/.test(error.message)) return json({error:'Invalid request.'},400);
-    if (/UNIQUE constraint failed/.test(error.message)) return json({error:'That email is already registered.'},409);
+    if (/UNIQUE constraint failed/.test(error.message)) return json({error:'That username or email is already registered.'},409);
     console.error(error);
     return json({error:'Request could not be completed.'},500);
   }
