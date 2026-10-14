@@ -52,6 +52,30 @@ async function ensureMemberProfiles(db) {
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`).run();
 }
+function parseTestimonyList(value) {
+  try {
+    const parsed=JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed.filter(item=>item && typeof item.id==='string' && typeof item.name==='string' && typeof item.title==='string' && typeof item.testimony==='string').slice(0,50) : [];
+  } catch {
+    return [];
+  }
+}
+async function loadTestimonyList(db) {
+  const row=await db.prepare("SELECT value FROM settings WHERE key='testimonies'").first();
+  return parseTestimonyList(row?.value);
+}
+async function saveTestimonyList(db,items) {
+  await db.prepare("INSERT INTO settings(key,value) VALUES('testimonies',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(items.slice(0,50))).run();
+}
+const publicTestimony = item => ({
+  id:item.id,
+  name:item.name,
+  title:item.title,
+  testimony:item.testimony,
+  published_at:item.published_at,
+  updated_at:item.updated_at,
+  photo_url:item.photo_key ? '/api/testimony-photo/' + encodeURIComponent(item.id) : null
+});
 const allowed = (user, section) => section === 'announcement' || section === 'theme' ? true : section === 'partner' ? ['admin','partner'].includes(user?.role) : section === 'mentorship' ? ['admin','mentee'].includes(user?.role) : false;
 async function limited(db, key, max) {
   const now = Math.floor(Date.now()/1000), row = await db.prepare('SELECT attempts, window_start FROM login_attempts WHERE key=?').bind(key).first();
@@ -138,6 +162,78 @@ export async function onRequest({ request, env, params }) {
       if (!name || message.length<10) return json({ error:'Please include your name and prayer request.' },400);
       await db.prepare('INSERT INTO prayer_requests(name,contact,request) VALUES(?,?,?)').bind(name,contact,message).run();
       return json({ ok:true },201);
+    }
+    if (path === '/testimonies' && method === 'GET') {
+      const items=await loadTestimonyList(db);
+      return json({items:items.map(publicTestimony)});
+    }
+    if (path.startsWith('/testimony-photo/') && method === 'GET') {
+      const id=decodeURIComponent(path.slice('/testimony-photo/'.length));
+      const item=(await loadTestimonyList(db)).find(entry=>entry.id===id);
+      if (!item?.photo_key || !env.PHOTOS) return json({error:'Testifier photo not found.'},404);
+      const object=await env.PHOTOS.get(item.photo_key);
+      if (!object) return json({error:'Testifier photo not found.'},404);
+      return new Response(object.body,{headers:{'content-type':item.photo_type || object.httpMetadata?.contentType || 'image/jpeg','content-length':String(object.size),'cache-control':'public, max-age=3600','x-content-type-options':'nosniff'}});
+    }
+    if (path === '/testimonies' && method === 'POST') {
+      if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
+      if (Number(request.headers.get('content-length')||0)>5_500_000) return json({error:'Photo too large (5 MB maximum).'},413);
+      const data=await request.formData();
+      const id=clean(data.get('id'),80), name=clean(data.get('name'),100), title=clean(data.get('title'),160), testimony=clean(data.get('testimony'),5000);
+      const file=data.get('photo'), hasPhoto=typeof File!=='undefined' && file instanceof File && file.size>0;
+      if (name.length<2 || !title || testimony.length<10) return json({error:'Enter the testifier name, a title, and a testimony of at least 10 characters.'},400);
+      const items=await loadTestimonyList(db);
+      const index=id ? items.findIndex(item=>item.id===id) : -1;
+      if (id && index<0) return json({error:'Testimony not found.'},404);
+      if (!id && items.length>=50) return json({error:'Please remove an older testimony before adding another.'},409);
+      const previous=index>=0 ? items[index] : null;
+      let photoKey=previous?.photo_key || null, photoType=previous?.photo_type || null, uploadedKey=null;
+      const removePhoto=!hasPhoto && data.get('remove_photo')==='yes';
+      if (hasPhoto) {
+        if (!env.PHOTOS) return json({error:'Photo storage is not configured.'},503);
+        if (file.size>5_000_000 || !['image/jpeg','image/png','image/webp'].includes(file.type)) return json({error:'Choose a JPEG, PNG or WebP image under 5 MB.'},400);
+        const buffer=await file.arrayBuffer(), head=new Uint8Array(buffer.slice(0,12));
+        const valid=file.type==='image/jpeg' ? head[0]===255&&head[1]===216&&head[2]===255 : file.type==='image/png' ? hex(head.slice(0,8))==='89504e470d0a1a0a' : hex(head.slice(0,4))==='52494646'&&hex(head.slice(8,12))==='57454250';
+        if (!valid) return json({error:'Invalid image file.'},400);
+        uploadedKey='testimonies/'+crypto.randomUUID();
+        await env.PHOTOS.put(uploadedKey,buffer,{httpMetadata:{contentType:file.type}});
+        photoKey=uploadedKey;
+        photoType=file.type;
+      } else if (removePhoto) {
+        photoKey=null;
+        photoType=null;
+      }
+      const now=new Date().toISOString();
+      const record={id:previous?.id || crypto.randomUUID(),name,title,testimony,published_at:previous?.published_at || now,updated_at:now,photo_key:photoKey,photo_type:photoType};
+      const next=previous ? items.map(item=>item.id===record.id?record:item) : [record,...items];
+      try {
+        await saveTestimonyList(db,next);
+      } catch (error) {
+        if (uploadedKey && env.PHOTOS) await env.PHOTOS.delete(uploadedKey).catch(()=>{});
+        throw error;
+      }
+      if (previous?.photo_key && previous.photo_key!==photoKey && env.PHOTOS) await env.PHOTOS.delete(previous.photo_key).catch(()=>{});
+      return json({ok:true,item:publicTestimony(record)},previous?200:201);
+    }
+    if (path === '/testimonies' && method === 'DELETE') {
+      if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
+      const input=await body(request);
+      const ids=Array.isArray(input.ids) ? input.ids.filter(id=>typeof id==='string').slice(0,50) : [];
+      if (input.confirm!=='CLEAR' || !ids.length) return json({error:'Confirm which testimonies to clear.'},400);
+      const selected=new Set(ids), items=await loadTestimonyList(db);
+      const removed=items.filter(item=>selected.has(item.id)), kept=items.filter(item=>!selected.has(item.id));
+      await saveTestimonyList(db,kept);
+      if (env.PHOTOS) await Promise.allSettled(removed.filter(item=>item.photo_key).map(item=>env.PHOTOS.delete(item.photo_key)));
+      return json({ok:true,deleted:removed.length});
+    }
+    if (path.startsWith('/testimonies/') && method === 'DELETE') {
+      if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
+      const id=decodeURIComponent(path.slice('/testimonies/'.length)), items=await loadTestimonyList(db);
+      const removed=items.find(item=>item.id===id);
+      if (!removed) return json({error:'Testimony not found.'},404);
+      await saveTestimonyList(db,items.filter(item=>item.id!==id));
+      if (removed.photo_key && env.PHOTOS) await env.PHOTOS.delete(removed.photo_key).catch(()=>{});
+      return json({ok:true});
     }
     if (path === '/church-word' && method === 'GET') {
       const row = await db.prepare("SELECT value FROM settings WHERE key='church_word'").first();
