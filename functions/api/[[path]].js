@@ -270,8 +270,7 @@ export async function onRequest({ request, env, params }) {
     }
     if (path === '/monthly-theme' && method === 'GET') {
       const saved=await db.prepare("SELECT value FROM settings WHERE key='monthly_theme'").first();
-      const legacy=await db.prepare("SELECT value FROM settings WHERE key='annual_theme'").first();
-      return json(parseMonthlyTheme(saved?.value,legacy?.value));
+      return json(parseMonthlyTheme(saved?.value,'To be announced'));
     }
     if (path === '/monthly-theme' && method === 'POST') {
       if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
