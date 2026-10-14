@@ -67,6 +67,20 @@ async function loadTestimonyList(db) {
 async function saveTestimonyList(db,items) {
   await db.prepare("INSERT INTO settings(key,value) VALUES('testimonies',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(items.slice(0,50))).run();
 }
+function currentMonthValue() {
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Africa/Lagos',year:'numeric',month:'2-digit'}).formatToParts(new Date()).map(part=>[part.type,part.value]));
+  return parts.year+'-'+parts.month;
+}
+function parseMonthlyTheme(value,fallbackTheme) {
+  const fallback={month:currentMonthValue(),theme:fallbackTheme || 'The Year of Dominion',scripture:''};
+  try {
+    const parsed=JSON.parse(value || '');
+    if (!parsed || !/^\d{4}-(0[1-9]|1[0-2])$/.test(parsed.month) || typeof parsed.theme !== 'string' || !parsed.theme.trim()) return fallback;
+    return {month:parsed.month,theme:clean(parsed.theme,150),scripture:clean(parsed.scripture,120)};
+  } catch {
+    return fallback;
+  }
+}
 const publicTestimony = item => ({
   id:item.id,
   name:item.name,
@@ -253,6 +267,20 @@ export async function onRequest({ request, env, params }) {
       if (input.confirm !== 'CLEAR' || !Number.isSafeInteger(input.throughId) || input.throughId < 1) return json({error:'Confirm which prayer requests to clear.'},400);
       const result = await db.prepare('DELETE FROM prayer_requests WHERE id<=?').bind(input.throughId).run();
       return json({ok:true,deleted:result.meta?.changes || 0});
+    }
+    if (path === '/monthly-theme' && method === 'GET') {
+      const saved=await db.prepare("SELECT value FROM settings WHERE key='monthly_theme'").first();
+      const legacy=await db.prepare("SELECT value FROM settings WHERE key='annual_theme'").first();
+      return json(parseMonthlyTheme(saved?.value,legacy?.value));
+    }
+    if (path === '/monthly-theme' && method === 'POST') {
+      if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
+      const input=await body(request), month=clean(input.month,7), theme=clean(input.theme,150), scripture=clean(input.scripture,120);
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return json({error:'Choose a valid month.'},400);
+      if (!theme) return json({error:'Theme is required.'},400);
+      const monthlyTheme={month,theme,scripture};
+      await db.prepare("INSERT INTO settings(key,value) VALUES('monthly_theme',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(monthlyTheme)).run();
+      return json({ok:true,...monthlyTheme});
     }
     if (path === '/theme' && method === 'GET') return json({ theme: (await db.prepare("SELECT value FROM settings WHERE key='annual_theme'").first())?.value || 'The Year of Dominion' });
     if (path === '/theme' && method === 'POST') {
