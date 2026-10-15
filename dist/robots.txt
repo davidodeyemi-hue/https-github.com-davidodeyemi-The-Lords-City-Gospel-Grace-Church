@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /partners/thank-you/
+Disallow: /prayer/thank-you/
+
+Sitemap: https://the-lords-city-gospel-grace-ministry.pages.dev/sitemap.xml
