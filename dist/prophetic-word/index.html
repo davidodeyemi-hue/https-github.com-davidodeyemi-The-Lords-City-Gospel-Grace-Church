@@ -24,9 +24,15 @@
 .word-panel h2{margin:0 0 22px;font:400 clamp(30px,4vw,45px)/1.12 Georgia,serif;color:#fff3dd;letter-spacing:-.03em}
 .word-panel p,.word-panel blockquote{margin:0;color:#d6dff1;font:17px/1.85 Georgia,serif;white-space:pre-wrap;overflow-wrap:anywhere}
 .word-panel blockquote{padding-left:22px;border-left:3px solid #ed945b}
+.message-excerpt-scroll{max-height:360px;overflow-y:auto;padding-right:18px;scrollbar-gutter:stable;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#ed945b #09132e}
+.message-excerpt-scroll:focus-visible{outline:2px solid #ffc580;outline-offset:6px}
+.message-excerpt-scroll::-webkit-scrollbar{width:10px}
+.message-excerpt-scroll::-webkit-scrollbar-track{background:#09132e;border-radius:999px}
+.message-excerpt-scroll::-webkit-scrollbar-thumb{background:linear-gradient(#ffc580,#ed945b);border:2px solid #09132e;border-radius:999px}
+.scroll-hint{margin:14px 0 0 25px;color:#ffc580;font:700 11px/1.4 Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase}
 .word-meta{min-height:20px;margin:0 0 24px;text-align:center;color:#99acd1;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
 .word-actions{text-align:center;padding:0 0 72px}.word-actions a{display:inline-block;color:#ffc580;text-decoration:none;border-bottom:1px solid #ffc58080;padding-bottom:4px}
-@media(max-width:780px){.word-hero{padding:64px 0 32px}.word-hero h1{font-size:clamp(39px,12vw,58px)}.word-grid{grid-template-columns:1fr;padding-bottom:65px}.word-panel{min-height:0;padding:27px}.eagle-watermark{top:160px;width:120vw;opacity:.08}}
+@media(max-width:780px){.word-hero{padding:64px 0 32px}.word-hero h1{font-size:clamp(39px,12vw,58px)}.word-grid{grid-template-columns:1fr;padding-bottom:65px}.word-panel{min-height:0;padding:27px}.message-excerpt-scroll{max-height:300px}.eagle-watermark{top:160px;width:120vw;opacity:.08}}
 </style>
 </head>
 <body class="interior-page word-page">
@@ -38,18 +44,28 @@
 <p class="wrap word-meta hidden" id="word-updated"></p>
 <section class="wrap word-grid" aria-label="Current word for the church">
 <article class="word-panel" aria-labelledby="declaration-title"><span class="panel-number" aria-hidden="true">01</span><span class="eyebrow">Prophetic declaration</span><h2 id="declaration-title">Prophetic declaration</h2><p id="declaration-text">The current prophetic declaration will be published here.</p></article>
-<article class="word-panel" aria-labelledby="excerpt-title"><span class="panel-number" aria-hidden="true">02</span><span class="eyebrow">From the message</span><h2 id="excerpt-title">Message excerpt</h2><blockquote id="excerpt-text">The latest message excerpt will be shared here.</blockquote></article>
+<article class="word-panel" aria-labelledby="excerpt-title"><span class="panel-number" aria-hidden="true">02</span><span class="eyebrow">From the message</span><h2 id="excerpt-title">Message excerpt</h2><blockquote id="excerpt-text" class="message-excerpt-scroll" tabindex="0" aria-label="Message excerpt">The latest message excerpt will be shared here.</blockquote><p class="scroll-hint" id="excerpt-scroll-hint" hidden>Scroll to continue <span aria-hidden="true">↓</span></p></article>
 </section>
 <div class="wrap word-actions"><a href="/messages/">Listen to full messages <span aria-hidden="true">→</span></a></div>
 </main>
 <footer><div class="wrap">The Lords City Gospel Grace Ministry · M.A. Alli Layout, Meridian Bus Stop, Apata, Ibadan</div></footer>
 <script>
+const excerptText=document.getElementById('excerpt-text');
+const excerptScrollHint=document.getElementById('excerpt-scroll-hint');
+function syncExcerptScroll(){
+ const isScrollable=excerptText.scrollHeight>excerptText.clientHeight+2;
+ excerptScrollHint.hidden=!isScrollable;
+ excerptText.setAttribute('aria-label',isScrollable?'Message excerpt. Scroll to read more.':'Message excerpt');
+}
+window.addEventListener('resize',syncExcerptScroll,{passive:true});
+requestAnimationFrame(syncExcerptScroll);
 fetch('/api/church-word').then(response=>{if(!response.ok)throw Error('Unavailable');return response.json()}).then(({word})=>{
  if(!word)return;
  if(typeof word.declarationTitle==='string'&&word.declarationTitle.trim())document.getElementById('declaration-title').textContent=word.declarationTitle;
  if(typeof word.declaration==='string'&&word.declaration.trim())document.getElementById('declaration-text').textContent=word.declaration;
  if(typeof word.excerptTitle==='string'&&word.excerptTitle.trim())document.getElementById('excerpt-title').textContent=word.excerptTitle;
- if(typeof word.excerpt==='string'&&word.excerpt.trim())document.getElementById('excerpt-text').textContent=word.excerpt;
+ if(typeof word.excerpt==='string'&&word.excerpt.trim())excerptText.textContent=word.excerpt;
+ requestAnimationFrame(syncExcerptScroll);
  if(typeof word.updatedAt==='string'&&word.updatedAt){
   const date=new Date(word.updatedAt),meta=document.getElementById('word-updated');
   if(!Number.isNaN(date.getTime())){meta.textContent='Updated '+date.toLocaleDateString('en-NG',{day:'numeric',month:'long',year:'numeric'});meta.classList.remove('hidden')}
