@@ -251,15 +251,26 @@ export async function onRequest({ request, env, params }) {
     }
     if (path === '/church-word' && method === 'GET') {
       const row = await db.prepare("SELECT value FROM settings WHERE key='church_word'").first();
-      return json({ word: row ? JSON.parse(row.value) : { title: 'Prophetic declaration', message: '' } });
+      let saved={};
+      try { saved=row ? JSON.parse(row.value) : {}; } catch {}
+      return json({word:{
+        declarationTitle:clean(saved.declarationTitle || saved.title || 'Prophetic declaration',150),
+        declaration:clean(saved.declaration || saved.message,6000),
+        excerptTitle:clean(saved.excerptTitle || 'Message excerpt',150),
+        excerpt:clean(saved.excerpt,6000),
+        updatedAt:clean(saved.updatedAt,40)
+      }});
     }
     if (path === '/church-word' && method === 'POST') {
       if (user?.role !== 'admin') return json({error:'Admin access required.'},403);
-      const input = await body(request);
-      if (typeof input.title !== 'string' || typeof input.message !== 'string' || !input.title.trim() || !input.message.trim() || input.title.length > 150 || input.message.length > 6000) return json({error:'Enter a title (up to 150 characters) and a message (up to 6,000 characters).'},400);
-      const word = { title: input.title.trim(), message: input.message.trim() };
+      const input=await body(request);
+      const declarationTitle=clean(input.declaration_title,150), declaration=clean(input.declaration,6000);
+      const excerptTitle=clean(input.excerpt_title,150), excerpt=clean(input.excerpt,6000);
+      if (!declarationTitle || !declaration) return json({error:'Enter the prophetic declaration title and text.'},400);
+      if (!excerptTitle) return json({error:'Enter a title for the message excerpt.'},400);
+      const word={declarationTitle,declaration,excerptTitle,excerpt,updatedAt:new Date().toISOString()};
       await db.prepare("INSERT INTO settings(key,value) VALUES('church_word',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(word)).run();
-      return json({ok:true});
+      return json({ok:true,word});
     }
     if (path === '/prayers' && method === 'DELETE') {
       if (user?.role !== 'admin') return json({error:'Admin access required.'},403);

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The current prophetic declaration and message excerpt from The Lords City Gospel Grace Ministry.">
+<title>Prophetic Declaration &amp; Message Excerpt | The Lords City Gospel Grace Ministry</title>
+<link rel="stylesheet" href="/site.css">
+<script src="/site.js" defer></script>
+<link rel="stylesheet" href="/brand.css?v=20261014">
+<style>
+.word-page{background:radial-gradient(circle at 50% 12%,#263f87 0,transparent 38%),linear-gradient(155deg,#080e29,#101d45 60%,#080e29);color:#f4f5ff}
+.word-main{position:relative;isolation:isolate;min-height:calc(100vh - 82px);overflow:hidden}
+.eagle-watermark{position:absolute;z-index:-1;top:75px;left:50%;width:min(900px,90vw);height:auto;transform:translateX(-50%);opacity:.11;pointer-events:none;user-select:none;filter:drop-shadow(0 0 34px #cf9b5050)}
+.word-hero{padding:88px 0 42px;text-align:center}
+.word-hero .eyebrow{color:#ffc987}
+.word-hero h1{max-width:900px;margin:14px auto 20px;font:400 clamp(42px,6vw,76px)/1.04 Georgia,serif;letter-spacing:-.045em;color:#fff6e8}
+.word-hero .lead{max-width:700px;margin:0 auto;color:#c6d2eb;font-size:18px;line-height:1.75}
+.word-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;padding:20px 0 90px}
+.word-panel{min-height:330px;padding:34px;border:1px solid #708bd044;border-radius:16px;background:linear-gradient(145deg,#16295dcc,#0d1738e8);box-shadow:0 22px 60px #02071b60;backdrop-filter:blur(5px)}
+.word-panel .panel-number{display:inline-grid;place-items:center;width:38px;height:38px;border:1px solid #f0b36c70;border-radius:50%;color:#ffc580;font:700 12px/1 Arial,sans-serif;letter-spacing:.08em}
+.word-panel .eyebrow{display:block;margin:24px 0 10px;color:#ffc580}
+.word-panel h2{margin:0 0 22px;font:400 clamp(30px,4vw,45px)/1.12 Georgia,serif;color:#fff3dd;letter-spacing:-.03em}
+.word-panel p,.word-panel blockquote{margin:0;color:#d6dff1;font:17px/1.85 Georgia,serif;white-space:pre-wrap;overflow-wrap:anywhere}
+.word-panel blockquote{padding-left:22px;border-left:3px solid #ed945b}
+.word-meta{min-height:20px;margin:0 0 24px;text-align:center;color:#99acd1;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.word-actions{text-align:center;padding:0 0 72px}.word-actions a{display:inline-block;color:#ffc580;text-decoration:none;border-bottom:1px solid #ffc58080;padding-bottom:4px}
+@media(max-width:780px){.word-hero{padding:64px 0 32px}.word-hero h1{font-size:clamp(39px,12vw,58px)}.word-grid{grid-template-columns:1fr;padding-bottom:65px}.word-panel{min-height:0;padding:27px}.eagle-watermark{top:160px;width:120vw;opacity:.08}}
+</style>
+</head>
+<body class="interior-page word-page">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header"><div class="wrap site-header-inner"><a class="site-brand" href="/" aria-label="The Lords City Gospel Grace Ministry home"><img src="/lord-city-logo.jpg" width="48" height="48" alt="The Lord City ministry logo"><span>THE LORDS CITY<br>GOSPEL GRACE MINISTRY</span></a><button class="site-menu-button" type="button" aria-controls="ministry-nav" aria-expanded="false">Menu</button><nav id="ministry-nav" class="site-nav" aria-label="Main navigation"><a href="/">Home</a><a href="/prophetic-word/">Prophetic Word</a><a href="/#services">Services</a><a href="/pastor/">Presiding Pastor</a><a href="/mentorship/">Mentorship</a><a href="/partners/">Partner</a><a href="/messages/">Messages</a><a href="/photos/">Photos</a><a href="/#testimonies">Testimonies</a><a href="/announcements/">News</a><a href="/giving/">Giving</a><a href="/admin/">Admin</a><a class="site-prayer-link" href="/prayer/">Prayer request</a></nav></div></header>
+<main id="main" class="word-main">
+<img class="eagle-watermark" src="/eagle-watermark.svg" alt="" aria-hidden="true">
+<section class="word-hero"><div class="wrap"><span class="eyebrow">A word for the church</span><h1>Prophetic declaration &amp; message excerpt</h1><p class="lead">Receive the current prophetic declaration and a short excerpt from the message being shared with the church.</p></div></section>
+<p class="wrap word-meta hidden" id="word-updated"></p>
+<section class="wrap word-grid" aria-label="Current word for the church">
+<article class="word-panel" aria-labelledby="declaration-title"><span class="panel-number" aria-hidden="true">01</span><span class="eyebrow">Prophetic declaration</span><h2 id="declaration-title">Prophetic declaration</h2><p id="declaration-text">The current prophetic declaration will be published here.</p></article>
+<article class="word-panel" aria-labelledby="excerpt-title"><span class="panel-number" aria-hidden="true">02</span><span class="eyebrow">From the message</span><h2 id="excerpt-title">Message excerpt</h2><blockquote id="excerpt-text">The latest message excerpt will be shared here.</blockquote></article>
+</section>
+<div class="wrap word-actions"><a href="/messages/">Listen to full messages <span aria-hidden="true">→</span></a></div>
+</main>
+<footer><div class="wrap">The Lords City Gospel Grace Ministry · M.A. Alli Layout, Meridian Bus Stop, Apata, Ibadan</div></footer>
+<script>
+fetch('/api/church-word').then(response=>{if(!response.ok)throw Error('Unavailable');return response.json()}).then(({word})=>{
+ if(!word)return;
+ if(typeof word.declarationTitle==='string'&&word.declarationTitle.trim())document.getElementById('declaration-title').textContent=word.declarationTitle;
+ if(typeof word.declaration==='string'&&word.declaration.trim())document.getElementById('declaration-text').textContent=word.declaration;
+ if(typeof word.excerptTitle==='string'&&word.excerptTitle.trim())document.getElementById('excerpt-title').textContent=word.excerptTitle;
+ if(typeof word.excerpt==='string'&&word.excerpt.trim())document.getElementById('excerpt-text').textContent=word.excerpt;
+ if(typeof word.updatedAt==='string'&&word.updatedAt){
+  const date=new Date(word.updatedAt),meta=document.getElementById('word-updated');
+  if(!Number.isNaN(date.getTime())){meta.textContent='Updated '+date.toLocaleDateString('en-NG',{day:'numeric',month:'long',year:'numeric'});meta.classList.remove('hidden')}
+ }
+}).catch(()=>{document.getElementById('declaration-text').textContent='The current word could not be loaded. Please refresh this page in a moment.'});
+</script>
+</body>
+</html>
