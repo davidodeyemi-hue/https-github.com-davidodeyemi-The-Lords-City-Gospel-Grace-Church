@@ -1,4 +1,4 @@
-# The Lord City Gospel Grace Church
+# The Lords City Gospel Grace Ministry
 
 The public church website is deployed to Cloudflare Pages from GitHub `main`. Static pages are present in the repository root and mirrored in `dist` because the current Pages project has published the repository root. The `functions` folder contains Pages Functions for the database features.
 
