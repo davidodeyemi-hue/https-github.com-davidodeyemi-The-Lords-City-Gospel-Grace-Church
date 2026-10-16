@@ -133,6 +133,39 @@ export async function onRequest({ request, env, params }) {
       await db.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,datetime('now','+7 days'))").bind(await sha(token),found.id).run();
       return json({ ok: true },200,{ 'set-cookie': cookie(token,604800) });
     }
+    if (path === '/partner-signup' && method === 'POST') {
+      const input = await body(request);
+      if (input.website) return json({ok:true},201);
+      const ip = await sha(request.headers.get('CF-Connecting-IP') || 'unknown');
+      if (await limited(db,'partner-signup:' + ip,5)) return json({error:'Too many registration attempts. Please try again later.'},429);
+      const username=usernameOf(input.username), name=clean(input.name,100), email=clean(input.email,200).toLowerCase();
+      const country=clean(input.country,80), countryCode=clean(input.countryCode,8), rawPhone=clean(input.phoneNumber,25);
+      const state=clean(input.state,80), city=clean(input.city,80);
+      const password=String(input.password||''), confirmation=String(input.passwordConfirmation||'');
+      const localDigits=rawPhone.replace(/\D/g,'').replace(/^0+/,'');
+      const fullPhone=countryCode+localDigits;
+      if (!validUsername(username)) return json({error:'Choose a username of 4 to 30 letters, numbers, dots, hyphens or underscores. It must begin with a letter or number.'},400);
+      if (name.length<2 || !/^\S+@\S+\.\S+$/.test(email) || country.length<2 || state.length<2 || city.length<2) return json({error:'Please complete all personal and location details correctly.'},400);
+      if (!/^\+\d{1,4}$/.test(countryCode) || !/^[0-9()\s-]{5,25}$/.test(rawPhone) || fullPhone.replace(/\D/g,'').length<7 || fullPhone.replace(/\D/g,'').length>15) return json({error:'Select a country calling code and enter a valid local phone number.'},400);
+      if (password.length<12 || password.length>128) return json({error:'Use a password of at least 12 characters.'},400);
+      if (password!==confirmation) return json({error:'The passwords do not match.'},400);
+      if (input.consent!==true && input.consent!=='yes') return json({error:'Please confirm that the ministry may store your details and contact you about partnership.'},400);
+      await ensureMemberProfiles(db);
+      if (await db.prepare('SELECT id FROM users WHERE email=? COLLATE NOCASE').bind(email).first()) return json({error:'That email is already registered. Please sign in instead.'},409);
+      if (await db.prepare('SELECT user_id FROM member_profiles WHERE username=? COLLATE NOCASE').bind(username).first()) return json({error:'That username is already in use. Please choose another.'},409);
+      let created;
+      try {
+        created=await db.prepare("INSERT INTO users(email,password_hash,role) VALUES(?,?,'partner')").bind(email,await hashPassword(password)).run();
+        await db.prepare('INSERT INTO member_profiles(user_id,username,full_name,gender,phone,state,city) VALUES(?,?,?,?,?,?,?)').bind(created.meta.last_row_id,username,name,'',fullPhone,clean(state+', '+country,160),city).run();
+      } catch (error) {
+        if (created?.meta?.last_row_id) await db.prepare('DELETE FROM users WHERE id=?').bind(created.meta.last_row_id).run();
+        if (/UNIQUE constraint failed/.test(error.message)) return json({error:'That username or email is already registered.'},409);
+        throw error;
+      }
+      const token=random();
+      await db.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,datetime('now','+7 days'))").bind(await sha(token),created.meta.last_row_id).run();
+      return json({ok:true,username},201,{'set-cookie':cookie(token,604800)});
+    }
     if (path === '/mentee-signup' && method === 'POST') {
       const input = await body(request);
       if (input.website) return json({ok:true},201);
