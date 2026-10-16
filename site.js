@@ -44,6 +44,9 @@ document.addEventListener('click',async event=>{if(event.target.matches('[data-l
       menuButton.before(motto);
     }
 
+    /* Keep the full-screen menu outside the filtered sticky header's containing block. */
+    if(header.contains(navigation))header.after(navigation);
+
     const syncMenu=()=>{
       const open=menuButton.getAttribute('aria-expanded')==='true';
       body.classList.toggle('nav-open',open);
