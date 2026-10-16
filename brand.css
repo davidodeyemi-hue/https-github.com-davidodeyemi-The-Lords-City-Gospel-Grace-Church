@@ -488,6 +488,7 @@ body .site-nav{
   counter-reset:menu-link;
   position:fixed!important;z-index:1150;inset:94px 0 0!important;
   display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(112px,1fr);
+  align-items:stretch;align-content:stretch;justify-items:stretch;
   gap:1px;width:auto!important;margin:0!important;padding:1px!important;overflow-y:auto;
   background:#ffffff22;border:0!important;
   opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-22px);
@@ -508,7 +509,7 @@ body .site-nav a:nth-child(4n+2):hover{background:#8d263f}
 body .site-nav a:nth-child(4n+3):hover{background:#194f59}
 body .site-nav a:nth-child(4n):hover{background:#4b2e74}
 body .site-nav a:hover:after,body .site-nav a:focus-visible:after{transform:rotate(45deg);background:#fff;color:#111216}
-body .site-nav .site-prayer-link{border:0;border-radius:0;box-shadow:none;background:#a7173a;color:#fff!important}
+body .site-nav .site-prayer-link{grid-column:1/-1;border:0;border-radius:0;box-shadow:none;background:#a7173a;color:#fff!important}
 
 /* Home hero: the torch remains central but now lives inside a dramatic, responsive stage. */
 body:not(.interior-page) .hero{
