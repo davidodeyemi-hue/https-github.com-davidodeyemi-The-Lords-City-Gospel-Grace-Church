@@ -197,7 +197,14 @@ body .service:last-child{border-right:1px solid #ffffff88}
 body .service:hover{transform:translateY(-5px);box-shadow:0 24px 44px #10286a38}
 body .service img{height:230px;object-fit:cover}
 body .service-body{padding:27px 29px 31px}
-body .service h3{font-size:27px;margin:10px 0 14px}
+body .service h3{
+  background:none;
+  color:#9b0b2f;
+  -webkit-text-fill-color:#9b0b2f;
+  font-size:27px;
+  font-weight:900;
+  margin:10px 0 14px;
+}
 body .service p{color:#334569;font-size:15px;line-height:1.7}
 body .service small{color:#9e1434}
 body .service .when{display:inline-block;padding:7px 13px;background:#173999;color:#fff;border-radius:999px;font-size:13px;margin-top:20px}
